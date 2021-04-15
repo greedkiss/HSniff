@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include "PacketCatcher.h"
+#include "PacketDumper.h"
 
 
 // CHSniffDlg 对话框
@@ -37,6 +39,8 @@ protected:
 	CComboBox combox_filter;
 	CListCtrl listCtrl_packetList;
 	CButton Button_start;
+	CTreeCtrl treeCtrl_packet;
+	CEdit edit_packet;
 
 	//控件相关函数
 	void initialComboBoxDevList();
@@ -44,8 +48,39 @@ protected:
 	void initialListCtrlPacketList();
 
 
+	
+
+	
+	//文件操作
+	bool createDirectory(const CString& dirPath);
+
+	//数据包
+	PacketCatcher catcher;
+	PacketPool pool;
+
+	//转储文件
+	PacketDumper	pktDumper;
+
+	/* 标志 */
+	bool    pktCaptureFlag;
+	bool	fileOpenFlag;
+	CString openFileName;	// 保存打开文件的文件名
+
+
 public:
 	afx_msg void OnBnClickedButton1();
 	afx_msg void OnBnClickedButton2();
+	afx_msg LRESULT OnPktCatchMessage(WPARAM wParam, LPARAM lParam);
 
+	//打印函数
+	int printListCtrlPacketList(const Packet& pkt);
+	int printListCtrlPacketList(PacketPool& pool);
+	int printListCtrlPacketList(PacketPool& pool, const CString& filter);
+
+	//转换函数
+	CString	MACAddr2CString(const MAC_Address& addr);
+	CString	IPAddr2CString(const IP_Address& addr);
+
+
+	afx_msg void OnBnClickedButton3();
 };

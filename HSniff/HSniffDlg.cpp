@@ -7,8 +7,8 @@
 #include "HSniff.h"
 #include "HSniffDlg.h"
 #include "afxdialogex.h"
-#include "PacketCap.h"
 #include <vector>
+#include "PacketCatcher.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -56,6 +56,10 @@ CHSniffDlg::CHSniffDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_HSNIFF_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	catcher.setPool(&pool);
+
+	pktCaptureFlag = false;
+	fileOpenFlag = false;
 }
 
 void CHSniffDlg::DoDataExchange(CDataExchange* pDX)
@@ -64,6 +68,9 @@ void CHSniffDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_COMBO1, combo_dev);
 	DDX_Control(pDX, IDC_COMBO2, combox_filter);
 	DDX_Control(pDX, IDC_LIST2, listCtrl_packetList);
+	DDX_Control(pDX, IDC_BUTTON2, Button_start);
+	DDX_Control(pDX, IDC_TREE1, treeCtrl_packet);
+	DDX_Control(pDX, IDC_EDIT1, edit_packet);
 }
 
 BEGIN_MESSAGE_MAP(CHSniffDlg, CDialogEx)
@@ -71,6 +78,10 @@ BEGIN_MESSAGE_MAP(CHSniffDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON1, &CHSniffDlg::OnBnClickedButton1)
+	ON_BN_CLICKED(IDC_BUTTON2, &CHSniffDlg::OnBnClickedButton2)
+	//捕获网络包的处理函数
+	ON_MESSAGE(WM_PKTCATCH, &CHSniffDlg::OnPktCatchMessage)
+	ON_BN_CLICKED(IDC_BUTTON3, &CHSniffDlg::OnBnClickedButton3)
 END_MESSAGE_MAP()
 
 
@@ -109,6 +120,7 @@ BOOL CHSniffDlg::OnInitDialog()
 	initialComboBoxDevList();
 	initialComboBoxFilterList();
 	initialListCtrlPacketList();
+	createDirectory(L".\\tmp");
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -164,12 +176,6 @@ HCURSOR CHSniffDlg::OnQueryDragIcon()
 
 
 
-void CHSniffDlg::OnBnClickedButton1()
-{
-	// TODO: 在此添加控件通知处理程序代码
-}
-
-
 void CHSniffDlg::initialComboBoxDevList()
 {
 	combo_dev.AddString(_T("选择网络设备"));
@@ -223,5 +229,235 @@ void CHSniffDlg::initialListCtrlPacketList() {
 	listCtrl_packetList.InsertColumn(++index, L"目的IP地址", LVCFMT_CENTER, rect.Width() * 0.175);
 }
 
+bool CHSniffDlg::createDirectory(const CString& dirPath)
+{
+	if (!PathIsDirectory(dirPath.GetString()))  // 是否有重名文件夹
+	{
+		::CreateDirectory(dirPath.GetString(), 0);
+		return true;
+	}
+	return false;
+}
+
+//开始抓包
+void CHSniffDlg::OnBnClickedButton2()
+{
+	// 获取当前时间
+	time_t tt = time(NULL);	// 这句返回的只是一个时间戳
+	localtime(&tt);
+	CTime currentTime(tt);
+
+	int devIndex = combo_dev.GetCurSel();
+	if (devIndex < 0) {
+		AfxMessageBox(L"请选择网卡", MB_OK);
+		return;
+	}
+	
+	//TODO 可以使能开始结束按钮
+	if (catcher.openAdapter(devIndex, currentTime))
+	{
+		CString status = L"正在捕获："+ catcher.getDevName();
+
+		/* 清空控件显示内容 */
+		listCtrl_packetList.DeleteAllItems();
+		treeCtrl_packet.DeleteAllItems();
+		edit_packet.SetWindowText(L"");
+		AfxGetMainWnd()->SetWindowText(status);
+
+		pool.clear();
+
+		CString fileName = L"SnifferUI_" + currentTime.Format("%Y%m%d%H%M%S") + L".pcap";
+		pktDumper.setPath(L".\\tmp\\" + fileName);
+
+		catcher.startCapture(MODE_CAPTURE_LIVE);
+		pktCaptureFlag = true;
+
+		openFileName = fileName;
+		fileOpenFlag = true;
+	}
+	else {
+		AfxMessageBox(L"打开网卡失败", MB_OK);
+		return;
+	}
+}
+
+//停止抓包
+void CHSniffDlg::OnBnClickedButton1()
+{
+	AfxGetMainWnd()->SetWindowText(pktDumper.getPath());
+
+	catcher.stopCapture();
+	pktCaptureFlag = false;
+	catcher.closeAdapter();
+}
+
+//MAC地址转换成cstring
+CString	CHSniffDlg::MACAddr2CString(const MAC_Address& addr)
+{
+	CString strAddr, strTmp;
+
+	for (int i = 0; i < 6; i++) {
+		strTmp.Format(L"%02X", addr.bytes[i]);
+		strAddr += strTmp + L"-";
+	}
+	strAddr.Delete(strAddr.GetLength() - 1, 1);
+
+	return strAddr;
+}
+
+//IP地址转换成cstring
+CString CHSniffDlg::IPAddr2CString(const IP_Address& addr)
+{
+	CString strAddr, strTmp;
+
+	for (int i = 0; i < 4; ++i)
+	{
+		strTmp.Format(L"%d", addr.bytes[i]);
+		strAddr += strTmp + L".";
+	}
+	strAddr.Delete(strAddr.GetLength() - 1, 1);
+
+	return strAddr;
+}
+
+//单数据包信息打印
+int CHSniffDlg::printListCtrlPacketList(const Packet& pkt)
+{
+	if (pkt.isEmpty())
+		return -1;
+
+	int row = 0;	// 行号
+	int col = 0;	// 列号
+	/* 打印编号 */
+	CString	strNum;
+	strNum.Format(L"%d", pkt.num);
+
+	UINT mask = LVIF_PARAM | LVIF_TEXT;
+
+	// protocol字段在OnCustomdrawList1()中使用
+	row = listCtrl_packetList.InsertItem(mask, listCtrl_packetList.GetItemCount(), strNum, 0, 0, 0, (LPARAM) & (pkt.protocol));
 
 
+	/* 打印时间 */
+	CTime pktArrivalTime((time_t)(pkt.header->ts.tv_sec));
+	CString strPktArrivalTime = pktArrivalTime.Format("%Y/%m/%d %H:%M:%S");
+	listCtrl_packetList.SetItemText(row, ++col, strPktArrivalTime);
+
+	/* 打印协议 */
+	if (!pkt.protocol.IsEmpty())
+		listCtrl_packetList.SetItemText(row, ++col, pkt.protocol);
+	else
+		++col;
+
+	/* 打印长度 */
+	CString strCaplen;
+	strCaplen.Format(L"%d", pkt.header->caplen);
+	listCtrl_packetList.SetItemText(row, ++col, strCaplen);
+
+	/* 打印源目MAC地址 */
+	if (pkt.ethh != NULL)
+	{
+		CString strSrcMAC = MACAddr2CString(pkt.ethh->srcaddr);
+		CString strDstMAC = MACAddr2CString(pkt.ethh->dstaddr);
+
+		listCtrl_packetList.SetItemText(row, ++col, strSrcMAC);
+		listCtrl_packetList.SetItemText(row, ++col, strDstMAC);
+	}
+	else
+	{
+		col += 2;
+	}
+
+	/* 打印源目IP地址 */
+	if (pkt.iph != NULL)
+	{
+		CString strSrcIP = IPAddr2CString(pkt.iph->srcaddr);
+		CString strDstIP = IPAddr2CString(pkt.iph->dstaddr);
+
+		listCtrl_packetList.SetItemText(row, ++col, strSrcIP);
+		listCtrl_packetList.SetItemText(row, ++col, strDstIP);
+	}
+	else
+	{
+		col += 2;
+	}
+	return 0;
+}
+
+//打印pool的信息
+int CHSniffDlg::printListCtrlPacketList(PacketPool& pool)
+{
+	if (pool.isEmpty())
+		return -1;
+	int pktNum = pool.getSize();
+	for (int i = 1; i <= pktNum; ++i)
+		printListCtrlPacketList(pool.get(i));
+
+	return pktNum;
+}
+
+
+//打印数据包信息
+int CHSniffDlg::printListCtrlPacketList(PacketPool& pool, const CString& filter)
+{
+	if (pool.isEmpty() || filter.IsEmpty())
+		return -1;
+
+	int pktNum = pool.getSize();
+	int filterPktNum = 0;
+	for (int i = 0; i < pktNum; ++i)
+	{
+		const Packet& pkt = pool.get(i);
+		if (pkt.protocol == filter)
+		{
+			printListCtrlPacketList(pkt);
+			++filterPktNum;
+		}
+	}
+	return filterPktNum;
+}
+
+//如果捕获到数据包，触发该事件
+LRESULT CHSniffDlg::OnPktCatchMessage(WPARAM wParam, LPARAM lParam)
+{
+	int pktNum = lParam;
+	if (pktNum > 0)
+	{
+		Packet& pkt = pool.get(pktNum);
+		/* 检查过滤器是否启动，若启动了，则只打印符合过滤器的新捕获数据包 */
+		int selFilterIndex = combox_filter.GetCurSel();
+		if (selFilterIndex != 9)
+		{
+			CString strFilter;
+			combox_filter.GetLBText(selFilterIndex, strFilter);
+			if (strFilter == pkt.protocol)
+				printListCtrlPacketList(pkt);
+		}
+		else {
+			printListCtrlPacketList(pkt);
+		}
+			
+
+		//updateStatusBar(CString(""), m_pool.getSize(), m_listCtrlPacketList.GetItemCount());
+	}
+
+	return 0;
+}
+
+void CHSniffDlg::OnBnClickedButton3()
+{
+	CString saveAsFilePath = _T("");
+	CString dumpFilePath = pktDumper.getPath();
+	CString defaultFileName = pktDumper.getPath();
+	CFileDialog	dlgFile(FALSE, L".pcap", defaultFileName, OFN_OVERWRITEPROMPT, _T("pcap文件 (*.pcap)|*.pcap|所有文件 (*.*)|*.*||"), NULL);
+
+	if (dlgFile.DoModal() == IDOK)
+	{
+		saveAsFilePath = dlgFile.GetPathName();
+		pktDumper.dump(saveAsFilePath);
+		//m_menu.EnableMenuItem(ID_MENU_FILE_SAVEAS, MF_GRAYED);	// 禁用菜单项"另存为"
+		AfxGetMainWnd()->SetWindowText(dlgFile.GetFileName());		// 修改标题栏
+		//m_statusBar.SetPaneText(0, "已保存至：" + saveAsFilePath, true);	// 修改状态栏
+
+	}
+}
