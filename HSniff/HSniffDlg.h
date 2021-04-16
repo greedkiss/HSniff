@@ -80,6 +80,22 @@ public:
 	int printListCtrlPacketList(PacketPool& pool);
 	int printListCtrlPacketList(PacketPool& pool, const CString& filter);
 	int printEditCtrlPacketBytes(const Packet& pkt);
+	int printTreeCtrlPacketDetails(const Packet& pkt);
+	int printEthernet2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printIP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printARP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printICMP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printTCP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printUDP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printDNS2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printDHCP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int	printHTTP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode);
+	int printDNSHeader(const Packet& pkt, HTREEITEM& parentNode);
+	HTREEITEM printDNSBanner(const Packet& pkt, HTREEITEM& parentNode);
+	CString DNSType2CString(const u_short& type);
+	CString DNSClass2CString(const u_short& classes);
+	int printDNSQuery(char* DNSQuery, const u_short& questions, HTREEITEM& parentNode);
+	int printDNSResourceRecord(char* DNSResourceRecord, const u_short& resourceRecordNum, const int& resourceRecordType, const DNS_Header* pDNSHeader, HTREEITEM parentNode);
 
 	//转换函数
 	CString	MACAddr2CString(const MAC_Address& addr);
@@ -87,4 +103,6 @@ public:
 
 
 	afx_msg void OnBnClickedButton3();
+	afx_msg void OnNMClickList2(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMRClickList2(NMHDR* pNMHDR, LRESULT* pResult);
 };
