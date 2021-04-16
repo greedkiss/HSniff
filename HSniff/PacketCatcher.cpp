@@ -139,7 +139,7 @@ void packet_handler(u_char* param, const struct pcap_pkthdr* header, const u_cha
 
 	// 若是在线抓包，则让线程睡眠0.5秒，防止界面卡顿
 	if (threadParam->m_mode == MODE_CAPTURE_LIVE) {
-		Sleep(500);
+		Sleep(200);
 	}
 }
 

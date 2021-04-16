@@ -77,6 +77,10 @@ BEGIN_MESSAGE_MAP(CHSniffDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+
+	ON_NOTIFY(NM_CLICK, IDC_LIST2, &CHSniffDlg::OnClickedList1)
+	ON_NOTIFY(NM_CUSTOMDRAW, IDC_LIST2, &CHSniffDlg::OnCustomdrawList1)
+
 	ON_BN_CLICKED(IDC_BUTTON1, &CHSniffDlg::OnBnClickedButton1)
 	ON_BN_CLICKED(IDC_BUTTON2, &CHSniffDlg::OnBnClickedButton2)
 	//捕获网络包的处理函数
@@ -459,5 +463,170 @@ void CHSniffDlg::OnBnClickedButton3()
 		AfxGetMainWnd()->SetWindowText(dlgFile.GetFileName());		// 修改标题栏
 		//m_statusBar.SetPaneText(0, "已保存至：" + saveAsFilePath, true);	// 修改状态栏
 
+	}
+}
+
+//点击列表显示详细信息
+void CHSniffDlg::OnClickedList1(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	/* 获取选中行的行号 */
+	int selectedItemIndex = listCtrl_packetList.GetSelectionMark();
+	CString strPktNum = listCtrl_packetList.GetItemText(selectedItemIndex, 0);
+	int pktNum = _ttoi(strPktNum);
+	if (pktNum < 1 || pktNum > pool.getSize())
+		return;
+
+	//POSITION pos = g_packetLinkList.FindIndex(pktNum - 1);
+	//Packet &pkt = g_packetLinkList.GetAt(pos);
+
+	const Packet& pkt = pool.get(pktNum);
+
+	//printTreeCtrlPacketDetails(pkt);
+	printEditCtrlPacketBytes(pkt);
+}
+
+int CHSniffDlg::printEditCtrlPacketBytes(const Packet& pkt)
+{
+	if (pkt.isEmpty())
+	{
+		return -1;
+	}
+
+	CString strPacketBytes, strTmp;
+	u_char* pHexPacketBytes = pkt.pkt_data;
+	u_char* pASCIIPacketBytes = pkt.pkt_data;
+	for (int byteCount = 0, byteCount16 = 0, offset = 0; byteCount < pkt.header->caplen && pHexPacketBytes != NULL; ++byteCount)
+	{
+		/* 若当前字节是行首，打印行首偏移量 */
+		if (byteCount % 16 == 0)
+		{
+			strTmp.Format(L"%04X:", offset);
+			strPacketBytes += strTmp + L" ";
+		}
+
+		/* 打印16进制字节 */
+		strTmp.Format(L"%02X", *pHexPacketBytes);
+		strPacketBytes += strTmp + L" ";
+		++pHexPacketBytes;
+		++byteCount16;
+
+		switch (byteCount16)
+		{
+		case 8:
+		{
+			/* 每读取8个字节打印一个制表符 */
+			strPacketBytes += "\t";
+			//strPacketBytes += "#";
+		}
+		break;
+		case 16:
+		{
+			/* 每读取16个字节打印对应字节的ASCII字符，只打印字母数字 */
+			if (byteCount16 == 16)
+			{
+				strPacketBytes += L" ";
+				for (int charCount = 0; charCount < 16; ++charCount, ++pASCIIPacketBytes)
+				{
+					strTmp.Format(L"%c", isalnum(*pASCIIPacketBytes) ? *pASCIIPacketBytes : '.');
+					strPacketBytes += strTmp;
+				}
+				strPacketBytes += "\r\n";
+				offset += 16;
+				byteCount16 = 0;
+			}
+		}
+		break;
+		default:break;
+		}
+	}
+	/* 若数据包总长度不是16字节对齐时，打印最后一行字节对应的ASCII字符 */
+	if (pkt.header->caplen % 16 != 0)
+	{
+		/* 空格填充，保证字节流16字节对齐 */
+		for (int spaceCount = 0, byteCount16 = (pkt.header->caplen % 16); spaceCount < 16 - (pkt.header->caplen % 16); ++spaceCount)
+		{
+			strPacketBytes += "  ";
+			strPacketBytes += " ";
+			++byteCount16;
+			if (byteCount16 == 8)
+			{
+				strPacketBytes += "\t";
+				//strPacketBytes += "#";
+			}
+		}
+		strPacketBytes += " ";
+		/* 打印最后一行字节对应的ASCII字符 */
+		for (int charCount = 0; charCount < (pkt.header->caplen % 16); ++charCount, ++pASCIIPacketBytes)
+		{
+			strTmp.Format(L"%c", isalnum(*pASCIIPacketBytes) ? *pASCIIPacketBytes : '.');
+			strPacketBytes += strTmp;
+		}
+		strPacketBytes += "\r\n";
+	}
+
+	edit_packet.SetWindowText(strPacketBytes);
+
+	return 0;
+}
+
+
+
+void CHSniffDlg::OnCustomdrawList1(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMLVCUSTOMDRAW pNMCD = (LPNMLVCUSTOMDRAW)pNMHDR;
+	*pResult = 0;
+
+	if (CDDS_PREPAINT == pNMCD->nmcd.dwDrawStage)
+	{
+		*pResult = CDRF_NOTIFYITEMDRAW;
+	}
+	else if (CDDS_ITEMPREPAINT == pNMCD->nmcd.dwDrawStage) // 一个Item(一行)被绘画前
+	{
+		COLORREF itemColor;
+		CString* pStrPktProtocol = (CString*)(pNMCD->nmcd.lItemlParam);	// 在printListCtrlPacketList(pkt)里将数据包的protocol字段传递过来
+
+		///* 若该行被选中，则将其背景颜色调整为 */
+		//if (pNMCD->nmcd.uItemState & CDIS_SELECTED)
+		//{
+		//	pNMCD->clrTextBk = RGB(0, 0, 0);
+		//}
+		if (!pStrPktProtocol->IsEmpty())
+		{
+			if (*pStrPktProtocol == "ARP")
+			{
+				itemColor = RGB(255, 182, 193);	// 红色
+			}
+			else if (*pStrPktProtocol == "ICMP")
+			{
+				itemColor = RGB(186, 85, 211);	// 紫色
+			}
+			else if (*pStrPktProtocol == "TCP")
+			{
+				itemColor = RGB(144, 238, 144);	// 绿色
+			}
+			else if (*pStrPktProtocol == "UDP")
+			{
+				itemColor = RGB(100, 149, 237);	// 蓝色
+
+			}
+			else if (*pStrPktProtocol == "DNS")
+			{
+				itemColor = RGB(135, 206, 250);	// 浅蓝色
+			}
+			else if (*pStrPktProtocol == "DHCP")
+			{
+				itemColor = RGB(189, 254, 76);	// 淡黄色
+			}
+			else if (*pStrPktProtocol == "HTTP")
+			{
+				itemColor = RGB(238, 232, 180);	// 黄色
+			}
+			else
+			{
+				itemColor = RGB(211, 211, 211);	// 灰色
+			}
+			pNMCD->clrTextBk = itemColor;
+		}
+		*pResult = CDRF_DODEFAULT;
 	}
 }

@@ -71,11 +71,15 @@ public:
 	afx_msg void OnBnClickedButton1();
 	afx_msg void OnBnClickedButton2();
 	afx_msg LRESULT OnPktCatchMessage(WPARAM wParam, LPARAM lParam);
+	//控件点击操作
+	afx_msg void OnClickedList1(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnCustomdrawList1(NMHDR* pNMHDR, LRESULT* pResult);
 
 	//打印函数
 	int printListCtrlPacketList(const Packet& pkt);
 	int printListCtrlPacketList(PacketPool& pool);
 	int printListCtrlPacketList(PacketPool& pool, const CString& filter);
+	int printEditCtrlPacketBytes(const Packet& pkt);
 
 	//转换函数
 	CString	MACAddr2CString(const MAC_Address& addr);
