@@ -163,7 +163,7 @@ int Packet::decodeEthernet()
 	if (isEmpty())
 	{
 		return -1;
-	}
+	} 
 
 	protocol = "Ethernet";
 	ethh = (Ethernet_Header*)pkt_data;

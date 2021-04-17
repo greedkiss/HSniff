@@ -68,7 +68,7 @@ bool PacketCatcher::openAdapter(int devIndex, const CTime& currentTime)
 
 	/* 打开转储文件 */
 	CString file = L"HSniff" + currentTime.Format("%Y%m%d%H%M%S") + L".pcap";
-	CString path = L".\\tmp\\" + file;
+	CString path = L"E:\\project\\HSniff\\HSniff\\tmp" + file;
 	
 	char* char_path = (LPSTR)(LPCTSTR)path;
 
@@ -116,16 +116,13 @@ bool PacketCatcher::closeAdapter()
 void packet_handler(u_char* param, const struct pcap_pkthdr* header, const u_char* pkt_data)
 {
 	ThreadParam* threadParam = (ThreadParam*)param;
-	// 根据捕获模式抓包
-
-	//pcap_dump((u_char*)threadParam->m_dumper, header, pkt_data);
 
 	switch (threadParam->m_mode)
 	{
 	case MODE_CAPTURE_LIVE:
 	{
 		threadParam->m_pool->add(header, pkt_data);
-		//pcap_dump((u_char*)threadParam->m_dumper, header, pkt_data);
+		pcap_dump((u_char*)threadParam->m_dumper, header, pkt_data);
 		break;
 	}
 	case MODE_CAPTURE_OFFLINE:
@@ -137,9 +134,9 @@ void packet_handler(u_char* param, const struct pcap_pkthdr* header, const u_cha
 
 	PostMessage(AfxGetMainWnd()->m_hWnd, WM_PKTCATCH, NULL, (LPARAM)(threadParam->m_pool->getLast().num));
 
-	// 若是在线抓包，则让线程睡眠0.5秒，防止界面卡顿
+	// 若是在线抓包，则让线程睡眠0.1秒，防止界面卡顿
 	if (threadParam->m_mode == MODE_CAPTURE_LIVE) {
-		Sleep(200);
+		Sleep(100);
 	}
 }
 

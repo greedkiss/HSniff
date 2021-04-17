@@ -35,6 +35,7 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 
+	afx_msg void On32771();
 };
 
 CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
@@ -48,6 +49,7 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
 
+	ON_COMMAND(ID_32771, &CAboutDlg::On32771)
 END_MESSAGE_MAP()
 
 
@@ -92,6 +94,7 @@ BEGIN_MESSAGE_MAP(CHSniffDlg, CDialogEx)
 
 	ON_BN_CLICKED(IDC_BUTTON3, &CHSniffDlg::OnBnClickedButton3)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST2, &CHSniffDlg::OnNMRClickList2)
+	ON_COMMAND(ID_32771, &CHSniffDlg::trackTCP)
 END_MESSAGE_MAP()
 
 
@@ -204,7 +207,7 @@ void CHSniffDlg::initialComboBoxDevList()
 	}
 	for (dev = allDevs; dev != NULL; dev = dev->next) {
 		if (dev->description != NULL) {
-			combo_dev.AddString((CString)dev->description);
+			combo_dev.AddString((CString)dev->name);
 		}
 	}
 }
@@ -284,8 +287,8 @@ void CHSniffDlg::OnBnClickedButton2()
 
 		pool.clear();
 
-		CString fileName = L"SnifferUI_" + currentTime.Format(L"%Y%m%d%H%M%S") + L".pcap";
-		pktDumper.setPath(L".\\tmp\\" + fileName);
+		CString fileName = L"Sniffer" + currentTime.Format(L"%Y%m%d%H%M%S") + L".pcap";
+		pktDumper.setPath(L"E:\\project\\HSniff\\HSniff\\tmp" + fileName);
 
 		catcher.startCapture(MODE_CAPTURE_LIVE);
 		pktCaptureFlag = true;
@@ -625,7 +628,7 @@ void CHSniffDlg::OnCustomdrawList1(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 }
 
-//	判断name中有无指针0xC0,并返回指针在name中的位置
+//判断name中有无指针0xC0,并返回指针在name中的位置
 int is0xC0PointerInName(char* name)
 {
 	if (name == NULL)
@@ -669,7 +672,6 @@ CString getNameInDNS(char* name, const DNS_Header* pDNSHeader)
 
 		free(pName);
 		return strName;
-
 	}
 }
 
@@ -679,7 +681,6 @@ CString get0xC0PointerValue(const DNS_Header* pDNSHeader, const int offset)
 	char* pValue = (char*)pDNSHeader + offset;
 	CString strValue = getNameInDNS(pValue, pDNSHeader);
 	return strValue;
-
 }
 
 CString translateNameInDNS(const char* name)
@@ -1447,13 +1448,6 @@ void CHSniffDlg::OnNMClickList2(NMHDR* pNMHDR, LRESULT* pResult)
 }
 
 
-void CHSniffDlg::OnNMRClickList2(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
-	// TODO: 在此添加控件通知处理程序代码
-	AfxMessageBox(L"hello", MB_OK);
-	*pResult = 0;
-}
 
 int CHSniffDlg::printDNSResourceRecord(char* DNSResourceRecord, const u_short& resourceRecordNum, const int& resourceRecordType, const DNS_Header* pDNSHeader, HTREEITEM parentNode)
 {
@@ -1802,7 +1796,6 @@ int CHSniffDlg::printDHCP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode)
 		case DHCP_OPTIONS_SUBNET_MASK:
 		{
 
-
 			strText = L"选项：（1）子网掩码";
 			HTREEITEM DHCPOptionNode = treeCtrl_packet.InsertItem(strText, DHCPNode, 0);
 
@@ -1820,7 +1813,6 @@ int CHSniffDlg::printDHCP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode)
 
 		case DHCP_OPTIONS_ROUTER_OPTION:
 		{
-
 
 			strText = L"选项：（3）路由器";
 			HTREEITEM DHCPOptionNode = treeCtrl_packet.InsertItem(strText, DHCPNode, 0);
@@ -1956,4 +1948,72 @@ int CHSniffDlg::printHTTP2TreeCtrl(const Packet& pkt, HTREEITEM& parentNode)
 		count += 2;
 	}
 	return 0;
+}
+
+//空处理
+void CAboutDlg::On32771()
+{
+
+}
+
+//右键CListCtrl
+void CHSniffDlg::OnNMRClickList2(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+
+	POINT pt;
+	GetCursorPos(&pt);
+	trackItemIndex = listCtrl_packetList.GetNextItem(-1, LVNI_SELECTED)+1;
+
+	menu.LoadMenu(IDR_MENU1);
+	CMenu* pop = menu.GetSubMenu(0);
+	pop->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, this);
+	pop->Detach();
+	menu.DestroyMenu();
+	*pResult = 0;
+}
+
+//TCP流跟踪
+void CHSniffDlg::trackTCP()
+{
+	if (trackItemIndex < 1 || trackItemIndex > pool.getSize())
+		return;
+
+	const Packet& pkt = pool.get(trackItemIndex);
+
+	if (pkt.iph == NULL) {
+		AfxMessageBox(L"目前只支持TCP流跟踪", MB_OK);
+		return;
+	}
+		
+	if (pkt.protocol != L"TCP") {
+		AfxMessageBox(L"目前只支持TCP流跟踪", MB_OK);
+		return;
+	}
+
+	//清空显示框
+	listCtrl_packetList.DeleteAllItems();
+	treeCtrl_packet.DeleteAllItems();
+	edit_packet.SetWindowText(L"");
+
+	CString strSrcIP = IPAddr2CString(pkt.iph->srcaddr);
+	CString strDstIP = IPAddr2CString(pkt.iph->dstaddr);
+	u_short srcport = pkt.tcph->srcport;
+	u_short dstport = pkt.tcph->dstport;
+
+	int pktAllNum = pool.getSize();
+	int trackPktNum = 0;
+	for (int i = 0; i < pktAllNum; ++i)
+	{
+		const Packet& pkt = pool.get(i);
+		if (pkt.protocol == L"TCP")
+		{
+			if ((IPAddr2CString(pkt.iph->srcaddr) == strSrcIP && IPAddr2CString(pkt.iph->dstaddr) == strDstIP)|| (IPAddr2CString(pkt.iph->dstaddr) == strSrcIP) || (IPAddr2CString(pkt.iph->srcaddr) == strDstIP)) {
+				if ((pkt.tcph->srcport == srcport && pkt.tcph->dstport == dstport) || (pkt.tcph->srcport == dstport && pkt.tcph->dstport == srcport)) {
+					printListCtrlPacketList(pkt);
+					++trackPktNum;
+				}	
+			}
+		}
+	}
 }

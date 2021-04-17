@@ -41,14 +41,13 @@ protected:
 	CButton Button_start;
 	CTreeCtrl treeCtrl_packet;
 	CEdit edit_packet;
+	CMenu menu;
 
 	//控件相关函数
 	void initialComboBoxDevList();
 	void initialComboBoxFilterList();
 	void initialListCtrlPacketList();
 
-
-	
 
 	
 	//文件操作
@@ -65,6 +64,9 @@ protected:
 	bool    pktCaptureFlag;
 	bool	fileOpenFlag;
 	CString openFileName;	// 保存打开文件的文件名
+
+	//追踪
+	int trackItemIndex;
 
 
 public:
@@ -105,4 +107,5 @@ public:
 	afx_msg void OnBnClickedButton3();
 	afx_msg void OnNMClickList2(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMRClickList2(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void trackTCP();
 };
