@@ -20,6 +20,7 @@
 #define	PORT_DHCP_CLIENT		67
 #define PORT_DHCP_SERVER		68
 #define PORT_HTTP				80
+#define PORT_TLS				443
 
 #define ARP_OPCODE_REQUET		1
 #define	ARP_OPCODE_REPLY		2
@@ -366,6 +367,7 @@ public:
 	DNS_Header* dnsh;			// DNS首部
 	DHCP_Header* dhcph;			// DHCP首部
 	u_char* httpmsg;		// HTTP报文
+	u_char* TLS;			//TLS数据
 
 	u_char* pkt_data;		// 数据包（帧）
 	struct pcap_pkthdr* header;		// 捕获数据包长度，数据包长度，数据包到达时间
@@ -390,6 +392,7 @@ public:
 	int decodeDNS(u_char* L4payload);
 	int decodeDHCP(u_char* L4payload);
 	int decodeHTTP(u_char* L4payload);
+	int decodeTLS(u_char* L4payload);
 
 	int getIPHeaderLegnth() const;
 	int getIPHeaderLengthRaw() const;

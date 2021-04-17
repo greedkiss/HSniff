@@ -268,8 +268,25 @@ int Packet::decodeTCP(u_char* L3payload)
 		{
 			decodeHTTP(L3payload + TCPHeaderLen);
 		}
-
 	}
+	else if(ntohs(tcph->srcport) == PORT_TLS || ntohs(tcph->dstport) == PORT_TLS){
+		int TLSLen = getL4PayloadLength();
+		if (TLSLen > 0)
+		{
+			decodeTLS(L3payload + TCPHeaderLen);
+		}
+	}
+	return 0;
+}
+
+int Packet::decodeTLS(u_char* L4payload) {
+	if (L4payload == NULL)
+	{
+		return -1;
+	}
+
+	protocol = "TLS";
+	TLS = L4payload;
 	return 0;
 }
 

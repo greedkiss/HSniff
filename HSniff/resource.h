@@ -16,6 +16,7 @@
 #define IDC_LIST2                       1005
 #define IDC_TREE1                       1006
 #define IDC_EDIT1                       1007
+#define IDC_BUTTON4                     1008
 #define ID_32771                        32771
 
 // Next default values for new objects

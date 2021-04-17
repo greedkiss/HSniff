@@ -38,12 +38,12 @@ bool PacketCatcher::setPool(PacketPool* pool)
 //打开网卡，获得文件描述符
 bool PacketCatcher::openAdapter(int devIndex, const CTime& currentTime)
 {
-	if (devIndex < 0 || m_adhandle) {
+	if (devIndex > 6 || m_adhandle) {
 		return false;
 	}
 
 	int count = 0;
-	int selDev = devIndex - 1;
+	int selDev = devIndex ;
 	pcap_if_t* dev, * allDevs;
 
 	if (pcap_findalldevs(&allDevs, NULL) == -1) {
@@ -68,9 +68,13 @@ bool PacketCatcher::openAdapter(int devIndex, const CTime& currentTime)
 
 	/* 打开转储文件 */
 	CString file = L"HSniff" + currentTime.Format("%Y%m%d%H%M%S") + L".pcap";
-	CString path = L"E:\\project\\HSniff\\HSniff\\tmp" + file;
-	
-	char* char_path = (LPSTR)(LPCTSTR)path;
+	//CString path = L"E:\\project\\HSniff\\HSniff\\tmp" + file;
+
+	CString path = L".\\tmp\\" + file;
+
+	int length = WideCharToMultiByte(CP_ACP, 0, path, -1, NULL, 0, NULL, NULL);
+	char* char_path = new char[length];
+	WideCharToMultiByte(CP_ACP, 0, path, -1, char_path, length, NULL, NULL);
 
 	m_dumper = pcap_dump_open(m_adhandle, char_path);
 
@@ -85,7 +89,9 @@ bool PacketCatcher::openAdapter(CString path)
 		return false;
 	m_dev = path;
 
-	char* char_path = (LPSTR)(LPCTSTR)path;
+	int length = WideCharToMultiByte(CP_ACP, 0, path, -1, NULL, 0, NULL, NULL);
+	char* char_path = new char[length];
+	WideCharToMultiByte(CP_ACP, 0, path, -1, char_path, length, NULL, NULL);
 
 	if ((m_adhandle = pcap_open_offline(char_path, NULL)) == NULL)
 	{

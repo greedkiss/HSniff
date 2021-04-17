@@ -95,6 +95,7 @@ BEGIN_MESSAGE_MAP(CHSniffDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON3, &CHSniffDlg::OnBnClickedButton3)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST2, &CHSniffDlg::OnNMRClickList2)
 	ON_COMMAND(ID_32771, &CHSniffDlg::trackTCP)
+	ON_BN_CLICKED(IDC_BUTTON4, &CHSniffDlg::OnBnClickedButton4)
 END_MESSAGE_MAP()
 
 
@@ -207,7 +208,7 @@ void CHSniffDlg::initialComboBoxDevList()
 	}
 	for (dev = allDevs; dev != NULL; dev = dev->next) {
 		if (dev->description != NULL) {
-			combo_dev.AddString((CString)dev->name);
+			combo_dev.AddString((CString)dev->description);
 		}
 	}
 }
@@ -288,7 +289,7 @@ void CHSniffDlg::OnBnClickedButton2()
 		pool.clear();
 
 		CString fileName = L"Sniffer" + currentTime.Format(L"%Y%m%d%H%M%S") + L".pcap";
-		pktDumper.setPath(L"E:\\project\\HSniff\\HSniff\\tmp" + fileName);
+		pktDumper.setPath(L"E:\\project\\HSniff\\HSniff\\tmp\\" + fileName);
 
 		catcher.startCapture(MODE_CAPTURE_LIVE);
 		pktCaptureFlag = true;
@@ -1981,11 +1982,6 @@ void CHSniffDlg::trackTCP()
 
 	const Packet& pkt = pool.get(trackItemIndex);
 
-	if (pkt.iph == NULL) {
-		AfxMessageBox(L"目前只支持TCP流跟踪", MB_OK);
-		return;
-	}
-		
 	if (pkt.protocol != L"TCP") {
 		AfxMessageBox(L"目前只支持TCP流跟踪", MB_OK);
 		return;
@@ -2014,6 +2010,42 @@ void CHSniffDlg::trackTCP()
 					++trackPktNum;
 				}	
 			}
+		}
+	}
+}
+
+//打开pcap文件
+void CHSniffDlg::OnBnClickedButton4()
+{
+	CFileDialog	dlgFile(TRUE, L".pcap", NULL, OFN_FILEMUSTEXIST | OFN_HIDEREADONLY, _T("pcap文件 (*.pcap)|*.pcap|所有文件 (*.*)|*.*||"), NULL);
+	if (dlgFile.DoModal() == IDOK)
+	{
+		CString openFilePath = dlgFile.GetPathName();
+		CString openFileName = dlgFile.GetFileName();
+		if (dlgFile.GetFileExt() != L"pcap")	// 检查文件扩展名
+		{
+			AfxMessageBox(L"无法打开文件" + openFileName + L"，请检查文件扩展名");
+			return;
+		}
+		if (openFileName == alreadyOpenFileName)	// 检查文件名，避免重复打开
+		{
+			AfxMessageBox(L"不能重复打开相同文件" + openFileName);
+			return;
+		}
+		if (catcher.openAdapter(openFilePath))
+		{
+			alreadyOpenFileName = openFileName;					// 保存文件名
+			AfxGetMainWnd()->SetWindowText(openFileName);	// 修改标题栏为文件名
+
+			listCtrl_packetList.DeleteAllItems();
+			treeCtrl_packet.DeleteAllItems();
+			edit_packet.SetWindowText(L"");
+			pool.clear();
+
+			pktDumper.setPath(openFilePath);
+			catcher.startCapture(MODE_CAPTURE_OFFLINE);
+			fileOpenFlag = true;
+
 		}
 	}
 }

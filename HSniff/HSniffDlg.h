@@ -59,6 +59,7 @@ protected:
 
 	//转储文件
 	PacketDumper	pktDumper;
+	CString alreadyOpenFileName;
 
 	/* 标志 */
 	bool    pktCaptureFlag;
@@ -108,4 +109,5 @@ public:
 	afx_msg void OnNMClickList2(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnNMRClickList2(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void trackTCP();
+	afx_msg void OnBnClickedButton4();
 };
