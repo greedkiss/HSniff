@@ -225,6 +225,7 @@ void CHSniffDlg::initialComboBoxFilterList()
 	filterList.push_back(L"DNS");
 	filterList.push_back(L"DHCP");
 	filterList.push_back(L"HTTP");
+	filterList.push_back(L"TLS");
 
 	combox_filter.AddString(_T("选择过滤器（可选）"));
 	combox_filter.SetCurSel(0);
@@ -448,7 +449,7 @@ LRESULT CHSniffDlg::OnPktCatchMessage(WPARAM wParam, LPARAM lParam)
 		Packet& pkt = pool.get(pktNum);
 		/* 检查过滤器是否启动，若启动了，则只打印符合过滤器的新捕获数据包 */
 		int selFilterIndex = combox_filter.GetCurSel();
-		if (selFilterIndex != 9)
+		if (selFilterIndex != 10)
 		{
 			CString strFilter;
 			combox_filter.GetLBText(selFilterIndex, strFilter);
@@ -458,9 +459,7 @@ LRESULT CHSniffDlg::OnPktCatchMessage(WPARAM wParam, LPARAM lParam)
 		else {
 			printListCtrlPacketList(pkt);
 		}
-			
-
-		//updateStatusBar(CString(""), m_pool.getSize(), m_listCtrlPacketList.GetItemCount());
+		
 	}
 
 	return 0;
@@ -477,9 +476,7 @@ void CHSniffDlg::OnBnClickedButton3()
 	{
 		saveAsFilePath = dlgFile.GetPathName();
 		pktDumper.dump(saveAsFilePath);
-		//m_menu.EnableMenuItem(ID_MENU_FILE_SAVEAS, MF_GRAYED);	// 禁用菜单项"另存为"
 		AfxGetMainWnd()->SetWindowText(dlgFile.GetFileName());		// 修改标题栏
-		//m_statusBar.SetPaneText(0, "已保存至：" + saveAsFilePath, true);	// 修改状态栏
 
 	}
 }
